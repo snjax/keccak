@@ -42,7 +42,7 @@ pub struct Block(pub [u64;BITRATE_CHUNKS]);
 
 // Circularly rotate 'value' to the left,
 // treating it as a quantity of the given size in bits.
-const fn rol(value: u64, left:usize) -> u64 {
+fn rol(value: u64, left:usize) -> u64 {
     if left == 0 {
         value
     } else {
