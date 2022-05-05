@@ -199,9 +199,9 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 
 [[package]]
 name = "fawkes-crypto"
-version = "4.3.3"
+version = "4.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5503605fe963d3eeb6c6441e7c571e32185ace5b80a73574be42c6b137a98a8e"
+checksum = "eb946fa90e029b7f61f8a121ccd4bc0155041f088c983282a4228d91b6c3ace8"
 dependencies = [
  "bit-vec",
  "blake2-rfc_bellman_edition",
@@ -407,6 +407,7 @@ version = "0.1.0"
 dependencies = [
  "fawkes-crypto",
  "hex",
+ "itertools",
 ]
 
 [[package]]

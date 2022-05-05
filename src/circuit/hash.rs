@@ -1,50 +1,190 @@
-use fawkes_crypto::circuit::{num::CNum, bool::CBool, cs::CS, bitify::{c_into_bits_le, c_into_bits_le}};
-use fawkes_crypto::ff_uint::PrimeFieldParams;
+use fawkes_crypto::circuit::{num::CNum, bool::CBool, cs::{CS, RCS}, bitify::{c_into_bits_le, c_from_bits_le}};
+use fawkes_crypto::ff_uint::{PrimeFieldParams, Num, NumRepr};
+use fawkes_crypto::core::sizedvec::SizedVec;
 use fawkes_crypto::core::signal::Signal;
-use fawkes_crypto::ff_uint::Num;
-
-use crate::native::hash::{BITRATE_BYTES, W, H};
+use std::{ops::Add, iter::repeat};
 
 
-const BITRATE_BITS: usize = BITRATE_BYTES * 8;
-
-#[derive(Clone)]
-pub struct CU64<C:CS>([CBool<C>;64]);
-
-#[derive(Clone)]
-pub struct CState<C:CS>([[CU64<C>;W];H]);
+use crate::circuit::bitifyex::{c_from_bits_le_ex, c_into_bits_le_ex};
 
 
-const FILED_LIMB_SIZE: usize = 248;
+use crate::native::hash::{BITRATE_BYTES, W, H, NR, ROUND_CONSTANTS, ROTATION_CONSTANTS, BITRATE_CHUNKS, DIGEST_CHUNKS, DIGEST_BYTES};
+
+
+type CU64<C> = SizedVec<CBool<C>, 64>;
+type CState<C> = SizedVec<CU64<C>, {W*H}>;
+
+pub const FILED_LIMB_SIZE: usize = 248;
+
 
 const INPUT_BE_INDEXES: [usize; FILED_LIMB_SIZE] = {
-    for i in 0..FILED_LIMB_SIZE/8 {
-        for j in 0..8 {
+    let mut t = [0; FILED_LIMB_SIZE];
+    let mut i = 0;
+    while i < FILED_LIMB_SIZE/8 {
+        let mut j = 0;
+        while j < 8 {
             t[i*8+j] = FILED_LIMB_SIZE - 8*(i+1) + j;
+            j+=1;
         }
+        i+=1;
     }
+    t
 };
 
 const INPUT_LE_INDEXES: [usize; FILED_LIMB_SIZE] = {
-    for i in 0..FILED_LIMB_SIZE/8 {
-        for j in 0..8 {
+    let mut t = [0; FILED_LIMB_SIZE];
+    let mut i = 0;
+    while i < FILED_LIMB_SIZE/8 {
+        let mut j = 0;
+        while j < 8 {
             t[i*8+j] = 8*i + j;
+            j+=1;
         }
+        i+=1;
     }
+    t
 };
 
 
 
 
-pub fn keccak256<C:CS>(data:&[CNum<CS>], len:usize, is_be:bool) -> [CBool<C>;256] {
 
-    let s = data.iter().flat_map(|e| {
-        let bits = c_into_bits_le(e, FILED_LIMB_SIZE);
-        let indexes = if is_be { INPUT_BE_INDEXES} else { INPUT_LE_INDEXES };
-        indexes.map(|i| bits[i])
-    });
-
-    std::unimplemented!()
+// Circularly rotate 'value' to the left,
+// treating it as a quantity of the given size in bits.
+fn rol<C:CS>(value: &[CBool<C>], left:usize) -> Vec<CBool<C>> {
+    let size = value.len();
+    let left = left % size;
+    value.iter().chain(value.iter())
+        .skip(size-left)
+        .take(size)
+        .cloned()
+        .collect()
 }
 
+
+
+pub fn c_keccak_f<C:CS>(state:&mut CState<C>) {
+    fn round<C:CS>(state:&mut CState<C>, rc:u64) {
+        let rc_ex = {
+            let mut t = NumRepr::<<C::Fr as PrimeFieldParams>::Inner>::ZERO;
+            for i in 0..64 {
+                if (rc >> i) & 1 == 1 {
+                    let n = 3*i + 1;
+                    let limb = n / 64;
+                    let bitpos = n % 64;
+                    t.as_inner_mut().as_mut()[limb] |= 1 << bitpos;
+                }
+            }
+            Num::from_uint_unchecked(t)
+        };
+
+        let one_ex = {
+            let mut t = NumRepr::<<C::Fr as PrimeFieldParams>::Inner>::ZERO;
+            for i in 0..64 { 
+                let n = 3*i;
+                let limb = n / 64;
+                let bitpos = n % 64;
+                t.as_inner_mut().as_mut()[limb] |= 1 << bitpos;
+            }
+            Num::from_uint_unchecked(t)
+        };
+        
+
+        let c = state.as_slice().chunks(H).map(|row| {
+            let  c = row.iter().map(|e|
+                c_from_bits_le_ex(e.as_slice(), 3, 0) 
+            ).reduce(CNum::add).unwrap();
+            let bits = c_into_bits_le_ex(&c, 64*3, 3, 0);
+            c_from_bits_le_ex(&bits, 2, 0)
+        }).collect::<Vec<_>>();
+
+        let theta:Vec<Vec<Vec<_>>> = (0..W).map(|x| {
+            let d = &c[(W+x-1)%W] + &c[(x+1)%W]*Num::from(4u64);
+            (0..H).map(|y| {
+                let s = &d+c_from_bits_le_ex(state[x*H+y].as_slice(), 2, 0);
+                let mut bits = c_into_bits_le_ex(&s, 65*2, 2, 0);
+                let t = bits[64].clone();
+                bits[0] ^= t;
+                bits[0..64].to_vec()
+            }).collect()
+        }).collect();
+
+
+        let rho_phi:Vec<Vec<_>> = (0..W).map(|x| {
+            (0..H).map(|y| {
+                let m = (3*y+x) % H;
+                let bits = rol(&theta[m][x], ROTATION_CONSTANTS[x][m]);
+                c_from_bits_le_ex(&bits, 3, 0)
+            }).collect()
+        }).collect();
+
+        let chi:Vec<Vec<_>> = (0..W).map(|x| {
+            (0..H).map(|y| {
+                let a = &rho_phi[x][y];
+                let b = &rho_phi[(x+1)%W][y];
+                let c = &rho_phi[(x+2)%W][y];
+                a*Num::from(2u64) + one_ex - b + c
+            }).collect()
+        }).collect();
+
+        let mut iota = chi;
+
+        iota[0][0]+=rc_ex;
+
+        for x in 0..W {
+            for y in 0..H {
+                let bits = c_into_bits_le_ex(&iota[x][y], 3*64, 3, 1);
+                state[x*H+y].as_mut_slice().clone_from_slice(&bits);
+            }
+        }
+    }
+
+    for i in 0..NR {
+        round(state, ROUND_CONSTANTS[i]);
+    }
+}
+
+
+fn c_absorb_block<C:CS>(state:&mut CState<C>, block:&[CBool<C>]) {
+    for i in 0..BITRATE_CHUNKS {
+        let t = i%W*H+i/W;
+        let a = c_from_bits_le_ex(state[t].as_slice(), 2, 0);
+        let b = c_from_bits_le_ex(&block[i*64..(i+1)*64], 2, 0);
+        state[t].as_mut_slice().clone_from_slice(&c_into_bits_le_ex(&(a+b), 64*2, 2, 0));
+    }
+    c_keccak_f(state);
+}
+
+
+pub fn c_keccak256<C:CS>(cs: &RCS<C>, data:&[CNum<C>], len:usize, is_big_endian:bool) -> SizedVec<CBool<C>, 256> {
+    let c_false = &CBool::from_const(cs, &false);
+    let c_true = &CBool::from_const(cs, &true);
+
+    let n_blocks = len / BITRATE_BYTES + 1;
+    let total_len = n_blocks * BITRATE_BYTES;
+
+    let indexes = if is_big_endian { INPUT_BE_INDEXES} else { INPUT_LE_INDEXES };
+    let mut data = data.iter().flat_map(|e| {
+        let bits = c_into_bits_le(&e,FILED_LIMB_SIZE);
+        indexes.map(|i| bits[i].clone())
+    }).chain(repeat(c_false).cloned()).take(total_len*8).collect::<Vec<_>>();
+
+    data[len*8] = c_true.clone();
+    data[total_len*8-1] = c_true.clone();
+
+    let mut state: CState<C> = repeat(&repeat(c_false).take(64).cloned().collect()).take(W*H).cloned().collect();
+
+    for i in 0..n_blocks {
+        c_absorb_block(&mut state, &data[i*BITRATE_BYTES*8..(i+1)*BITRATE_BYTES*8]);
+    }
+
+    (0..DIGEST_CHUNKS).flat_map(|i| state[i%W*H+i/W].iter()).take(DIGEST_BYTES*8).cloned().collect()
+}
+
+
+pub fn c_keccak256_reduced<C:CS>(cs: &RCS<C>, data:&[CNum<C>], len:usize, is_big_endian:bool) -> CNum<C> {
+    let h = c_keccak256(cs, data, len, is_big_endian);
+    c_from_bits_le(h.as_slice())
+
+}
 

@@ -11,12 +11,12 @@ pub fn c_from_bits_le_ex<C: CS>(bits: &[CBool<C>], window:usize, offset:usize) -
     let multiplier = Num::from(1<<window);
     for i in 1..bits.len() {
         k = k * multiplier;
-        acc += k * bits[i].to_num();
+        acc += k * bits[i].to_num();   
     }
     acc
 }
 
-pub fn c_to_bits_le_ex<C: CS>(num: &CNum<C>, limit:usize, window:usize, offset:usize) -> Vec<CBool<C>> {
+pub fn c_into_bits_le_ex<C: CS>(num: &CNum<C>, limit:usize, window:usize, offset:usize) -> Vec<CBool<C>> {
     assert!(window > 0, "should be positive window size");
     assert!(offset < window, "offset should be smaller than window size");
     assert!(limit < C::Fr::MODULUS_BITS as usize, "limit too large");

@@ -13,7 +13,7 @@ fn test_long_value() {
     assert_eq!(encode(&keccak256(data)), "60d820b069bdb4545c690a11e8f8e6e444878010228920dd1598925a8fc2edcf");
 }
 #[test]
-fn test_bit_sized_value() {
+fn test_bitrate_sized_value() {
     let data = b"A perfect hash function for a specific set S that can be evaluated in constant time, and with values in a small range, can be found by a";
     assert_eq!(encode(&keccak256(data)), "cbc4b8ef339db1aaa81db0865c8010717a80b2314934d12c805653a0eb9b44f6");
 }

@@ -9,5 +9,8 @@ crate-type = ["rlib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-fawkes-crypto = { version = "4.3.3", features = ["rand_support"] }
+fawkes-crypto = { version = "4.4.0", features = ["rand_support"] }
 hex = "0.3.1"
+
+[dev-dependencies]
+itertools = "0.10.3"

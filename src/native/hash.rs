@@ -109,7 +109,7 @@ fn keccak_f(state:&mut State) {
     fn round(state:&mut State, rc:u64) {
 
         //theta
-        let c = state.0.iter().map(|row| row.iter().fold(0, u64::bitxor)).collect::<Vec<_>>();
+        let c = state.0.iter().map(|row| row.iter().cloned().reduce(u64::bitxor).unwrap()).collect::<Vec<_>>();
         for x in 0..W {
             let d = c[(W+x-1)%W] ^ rol(c[(x+1)%W], 1);
             for y in 0..H {
