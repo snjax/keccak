@@ -2,6 +2,9 @@
 name = "fawkes-crypto-keccak256"
 version = "0.1.1"
 edition = "2021"
+description = "Keccak256 hash function for Fawkes Crypto"
+authors = ["Igor Gulamov"]
+license = "MIT"
 
 [lib]
 crate-type = ["rlib"]
