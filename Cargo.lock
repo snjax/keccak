@@ -234,6 +234,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fawkes-crypto-keccak256"
+version = "0.1.1"
+dependencies = [
+ "fawkes-crypto",
+ "hex",
+ "itertools",
+]
+
+[[package]]
 name = "fawkes-crypto-pairing_ce"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -400,15 +409,6 @@ name = "keccak"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67c21572b4949434e4fc1e1978b99c5f77064153c59d998bf13ecd96fb5ecba7"
-
-[[package]]
-name = "keccak256"
-version = "0.1.1"
-dependencies = [
- "fawkes-crypto",
- "hex",
- "itertools",
-]
 
 [[package]]
 name = "libc"
