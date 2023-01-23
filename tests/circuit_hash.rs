@@ -6,8 +6,8 @@ use fawkes_crypto::{
 };
 use itertools::Itertools;
 
-use keccak256::native::hash::keccak256;
-use keccak256::circuit::hash::{c_keccak256};
+use fawkes_crypto_keccak256::native::hash::keccak256;
+use fawkes_crypto_keccak256::circuit::hash::{c_keccak256};
 
 
 fn perform_test(data:&[u8]) {

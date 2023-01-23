@@ -9,7 +9,7 @@ use fawkes_crypto::{
 };
 
 
-use keccak256::circuit::bitifyex::{c_from_bits_le_ex, c_into_bits_le_ex};
+use fawkes_crypto_keccak256::circuit::bitifyex::{c_from_bits_le_ex, c_into_bits_le_ex};
 
 #[test]
 fn test_xor_2_nums() {

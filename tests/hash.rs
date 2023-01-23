@@ -1,4 +1,4 @@
-use keccak256::native::hash::keccak256;
+use fawkes_crypto_keccak256::native::hash::keccak256;
 use hex::encode;
 
 #[test]
